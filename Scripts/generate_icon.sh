@@ -4,7 +4,7 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 cd "$DIR"
 
-echo "=== pomo Minimalist İkonu Üretiliyor ==="
+echo "=== pomo Minimalist Glowish Sliced Circle İkonu Üretiliyor ==="
 
 swift - << 'SWIFT'
 import AppKit
@@ -26,64 +26,108 @@ let rep = NSBitmapImageRep(
 NSGraphicsContext.saveGraphicsState()
 let context = NSGraphicsContext(bitmapImageRep: rep)!
 NSGraphicsContext.current = context
+let cg = context.cgContext
 
 let rect = NSRect(x: 0, y: 0, width: size, height: size)
 
-// 1. Pure Black Background with rounded squircle
+// 1. Deep Pitch Black Background (#000000)
 let bgPath = NSBezierPath(roundedRect: rect, xRadius: 228, yRadius: 228)
-NSColor(calibratedRed: 0.0, green: 0.0, blue: 0.0, alpha: 1.0).setFill()
+NSColor.black.setFill()
 bgPath.fill()
 
-// Subtle inner border (Liquid Glass micro-rim)
+// Specular micro-rim around macOS squircle
 let rimPath = NSBezierPath(roundedRect: rect.insetBy(dx: 2, dy: 2), xRadius: 226, yRadius: 226)
-rimPath.lineWidth = 3
-NSColor(calibratedWhite: 1.0, alpha: 0.12).setStroke()
+rimPath.lineWidth = 2.5
+NSColor(white: 1.0, alpha: 0.12).setStroke()
 rimPath.stroke()
 
-// 2. Minimalist Timer Dial Geometry (Massimo Vignelli inspired)
-let center = NSPoint(x: size / 2, y: size / 2)
-let radius: CGFloat = 310
+let center = CGPoint(x: size / 2, y: size / 2)
+let radius: CGFloat = 280
 
-// Outer subtle circle track (#8E8E93 at 25% opacity)
-let trackPath = NSBezierPath()
-trackPath.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
-trackPath.lineWidth = 14
-NSColor(calibratedWhite: 0.55, alpha: 0.25).setStroke()
-trackPath.stroke()
+// 2. Radiant Atmospheric Background Bloom (Radial Glow starting at 0.0)
+let colorSpace = CGColorSpaceCreateDeviceRGB()
+let glowColors = [
+    NSColor(white: 1.0, alpha: 0.28).cgColor,
+    NSColor(white: 1.0, alpha: 0.14).cgColor,
+    NSColor(white: 1.0, alpha: 0.04).cgColor,
+    NSColor(white: 0.0, alpha: 0.0).cgColor
+] as CFArray
+let glowLocations: [CGFloat] = [0.0, 0.40, 0.70, 1.0]
+if let radialGradient = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: glowLocations) {
+    cg.saveGState()
+    cg.drawRadialGradient(
+        radialGradient,
+        startCenter: center,
+        startRadius: 0.0,
+        endCenter: center,
+        endRadius: radius * 1.6,
+        options: []
+    )
+    cg.restoreGState()
+}
 
-// Active Pomodoro Arc (Top 12 o'clock, 25 minutes = 150 degrees clockwise)
-// In macOS standard coordinates, 90 is top (12 o'clock). 25 min = 150 deg clockwise -> 90 to -60 (300)
-let arcPath = NSBezierPath()
-arcPath.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 300, clockwise: true)
-arcPath.lineWidth = 36
-arcPath.lineCapStyle = .round
-NSColor.white.setStroke()
-arcPath.stroke()
+// 3. Construct Sliced Circle Geometry (60-degree slice missing near 12 o'clock)
+let cutStart: CGFloat = 85.0 * .pi / 180.0  // near 12 o'clock
+let cutEnd: CGFloat = 25.0 * .pi / 180.0    // near 2 o'clock
 
-// 3. Center Focus Dot (pure white minimalist dot)
-let centerDotRadius: CGFloat = 42
-let centerDotRect = NSRect(
-    x: center.x - centerDotRadius,
-    y: center.y - centerDotRadius,
-    width: centerDotRadius * 2,
-    height: centerDotRadius * 2
-)
-let centerDotPath = NSBezierPath(ovalIn: centerDotRect)
-NSColor.white.setFill()
-centerDotPath.fill()
+let pStart = CGPoint(x: center.x + radius * cos(cutStart), y: center.y + radius * sin(cutStart))
+let pEnd = CGPoint(x: center.x + radius * cos(cutEnd), y: center.y + radius * sin(cutEnd))
 
-// 4. 12 o'clock Apex Precision Marker
-let markerRadius: CGFloat = 16
-let markerCenter = NSPoint(x: center.x, y: center.y + radius)
-let markerRect = NSRect(
-    x: markerCenter.x - markerRadius,
-    y: markerCenter.y - markerRadius,
-    width: markerRadius * 2,
-    height: markerRadius * 2
-)
-let markerPath = NSBezierPath(ovalIn: markerRect)
-NSColor.white.setFill()
-markerPath.fill()
+let slicedPath = CGMutablePath()
+slicedPath.move(to: center)
+slicedPath.addLine(to: pStart)
+slicedPath.addArc(center: center, radius: radius, startAngle: cutStart, endAngle: cutEnd, clockwise: false)
+slicedPath.addLine(to: center)
+slicedPath.closeSubpath()
+
+// 4. Multi-tier Gaussian Glow (Bloom)
+let bloomPasses: [(blur: CGFloat, alpha: CGFloat)] = [
+    (140.0, 0.16),
+    (80.0, 0.26),
+    (40.0, 0.45),
+    (18.0, 0.70),
+    (6.0, 0.95)
+]
+
+for pass in bloomPasses {
+    cg.saveGState()
+    cg.setShadow(
+        offset: .zero,
+        blur: pass.blur,
+        color: NSColor(white: 1.0, alpha: pass.alpha).cgColor
+    )
+    cg.addPath(slicedPath)
+    cg.setFillColor(NSColor(white: 1.0, alpha: 0.35).cgColor)
+    cg.fillPath()
+    cg.restoreGState()
+}
+
+// 5. Core Luminous Body (Pure White with Subtle Vignelli Gradient)
+cg.saveGState()
+cg.addPath(slicedPath)
+cg.clip()
+
+let coreColors = [
+    NSColor(white: 1.0, alpha: 1.0).cgColor,
+    NSColor(white: 0.94, alpha: 1.0).cgColor
+] as CFArray
+if let coreGrad = CGGradient(colorsSpace: colorSpace, colors: coreColors, locations: [0.0, 1.0]) {
+    cg.drawLinearGradient(
+        coreGrad,
+        start: CGPoint(x: center.x, y: center.y + radius),
+        end: CGPoint(x: center.x, y: center.y - radius),
+        options: []
+    )
+}
+cg.restoreGState()
+
+// 6. Intense Razor-Sharp Glowing Edge Stroke
+cg.saveGState()
+cg.addPath(slicedPath)
+cg.setStrokeColor(NSColor.white.cgColor)
+cg.setLineWidth(2.5)
+cg.strokePath()
+cg.restoreGState()
 
 NSGraphicsContext.restoreGraphicsState()
 
@@ -106,4 +150,4 @@ sips -z 1024 1024 Resources/app_icon_1024.png --out build/pomo.iconset/icon_512x
 iconutil -c icns build/pomo.iconset -o Resources/AppIcon.icns
 rm -rf build/pomo.iconset
 
-echo "Tamamlandı: Resources/AppIcon.icns oluşturuldu."
+echo "Tamamlandı: Resources/AppIcon.icns güncellendi."
