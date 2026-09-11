@@ -1,0 +1,330 @@
+import AppKit
+import SwiftUI
+import Combine
+
+final class PomoPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+@MainActor
+public final class PomoPanelController: NSObject, NSWindowDelegate {
+    public static let shared = PomoPanelController()
+
+    private var statusItem: NSStatusItem?
+    private var panel: NSPanel?
+    private var eventMonitor: Any?
+    private var timerCancellables = Set<AnyCancellable>()
+
+    public let sessionManager = SessionManager()
+    public lazy var timerEngine = TimerEngine(sessionManager: sessionManager)
+
+    private var isDetached: Bool = false
+
+    private override init() {
+        super.init()
+    }
+
+    public func setup() {
+        setupMainMenu()
+        setupStatusItem()
+        setupPanel()
+        setupHotkeys()
+        setupTimerObservations()
+        NotificationManager.shared.requestAuthorization()
+    }
+
+    // MARK: - Main Menu (Enables standard Shortcuts & Cmd+D Theme)
+
+    private func setupMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu(title: "pomo")
+        appMenu.addItem(withTitle: "Toggle Start/Pause", action: #selector(toggleTimerAction), keyEquivalent: "p")
+        if let item = appMenu.items.last {
+            item.keyEquivalentModifierMask = [.command, .option]
+        }
+        appMenu.addItem(withTitle: "Reset Timer", action: #selector(resetTimerAction), keyEquivalent: "r")
+        appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(withTitle: "Quit pomo", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redoItem = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(redoItem)
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        let viewMenuItem = NSMenuItem()
+        let viewMenu = NSMenu(title: "View")
+        viewMenu.addItem(withTitle: "Toggle Theme", action: #selector(toggleThemeAction), keyEquivalent: "d")
+        viewMenuItem.submenu = viewMenu
+        mainMenu.addItem(viewMenuItem)
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    // MARK: - Status Item Setup
+
+    private func setupStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        guard let button = statusItem?.button else { return }
+
+        updateStatusBarTitle()
+
+        button.target = self
+        button.action = #selector(statusItemClicked)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
+    private func setupTimerObservations() {
+        timerEngine.$remainingSeconds
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateStatusBarTitle()
+            }
+            .store(in: &timerCancellables)
+
+        timerEngine.$state
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateStatusBarTitle()
+            }
+            .store(in: &timerCancellables)
+
+        timerEngine.$mode
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateStatusBarTitle()
+            }
+            .store(in: &timerCancellables)
+    }
+
+    public func updateStatusBarTitle() {
+        guard let button = statusItem?.button else { return }
+
+        let text = timerEngine.menuBarTitle
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .medium)
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.labelColor
+        ]
+
+        button.attributedTitle = NSAttributedString(string: "  " + text, attributes: attributes)
+
+        // Draw minimalist status dot icon
+        let size = NSSize(width: 14, height: 16)
+        let image = NSImage(size: size, flipped: false) { rect in
+            let isRunning = self.timerEngine.isRunning
+            let isRest = self.timerEngine.mode == .rest
+
+            let dotRect = NSRect(x: 2, y: 4, width: 8, height: 8)
+
+            if isRest {
+                // Rest period: concentric outline dot
+                let path = NSBezierPath(ovalIn: dotRect)
+                path.lineWidth = 1.3
+                NSColor.labelColor.setStroke()
+                path.stroke()
+            } else {
+                // Focus: filled solid dot when running, hollow when idle
+                let path = NSBezierPath(ovalIn: dotRect)
+                if isRunning {
+                    NSColor.labelColor.setFill()
+                    path.fill()
+                } else {
+                    path.lineWidth = 1.3
+                    NSColor.labelColor.setStroke()
+                    path.stroke()
+                }
+            }
+            return true
+        }
+        image.isTemplate = true
+        button.image = image
+        button.imagePosition = .imageLeft
+    }
+
+    // MARK: - Panel Setup
+
+    private func setupPanel() {
+        let popoverContent = PomoPopoverView(
+            timerEngine: timerEngine,
+            sessionManager: sessionManager,
+            isDetached: isDetached,
+            onToggleDetach: { [weak self] in
+                self?.toggleDetachMode()
+            },
+            onClose: { [weak self] in
+                self?.closeDockedPanel()
+            }
+        )
+
+        let hostingView = NSHostingView(rootView: popoverContent)
+
+        let panel = PomoPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 350, height: 240),
+            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+
+        panel.contentView = hostingView
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.isMovableByWindowBackground = true
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.delegate = self
+
+        self.panel = panel
+    }
+
+    private func updatePanelContent() {
+        let popoverContent = PomoPopoverView(
+            timerEngine: timerEngine,
+            sessionManager: sessionManager,
+            isDetached: isDetached,
+            onToggleDetach: { [weak self] in
+                self?.toggleDetachMode()
+            },
+            onClose: { [weak self] in
+                self?.closeDockedPanel()
+            }
+        )
+        panel?.contentView = NSHostingView(rootView: popoverContent)
+    }
+
+    // MARK: - Hotkeys
+
+    private func setupHotkeys() {
+        GlobalHotkeyManager.shared.setup(
+            onToggleTimer: { [weak self] in
+                self?.timerEngine.togglePlayPause()
+            },
+            onResetTimer: { [weak self] in
+                self?.timerEngine.reset()
+            },
+            onSelectFocus: { [weak self] in
+                self?.timerEngine.switchMode(to: .focus)
+            },
+            onSelectRest: { [weak self] in
+                self?.timerEngine.switchMode(to: .rest)
+            },
+            onClosePanel: { [weak self] in
+                self?.closeDockedPanel()
+            }
+        )
+    }
+
+    // MARK: - Actions
+
+    @objc private func toggleTimerAction() {
+        timerEngine.togglePlayPause()
+    }
+
+    @objc private func resetTimerAction() {
+        timerEngine.reset()
+    }
+
+    @objc private func toggleThemeAction() {
+        let current = UserDefaults.standard.string(forKey: "appTheme") ?? "system"
+        let next: String
+        switch current {
+        case "system": next = "dark"
+        case "dark": next = "light"
+        default: next = "system"
+        }
+        UserDefaults.standard.set(next, forKey: "appTheme")
+        updatePanelContent()
+    }
+
+    @objc private func statusItemClicked() {
+        if isDetached {
+            if let panel = panel {
+                if panel.isVisible {
+                    panel.orderOut(nil)
+                } else {
+                    panel.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+        } else {
+            toggleDockedPanel()
+        }
+    }
+
+    private func toggleDockedPanel() {
+        guard let panel = panel, let button = statusItem?.button else { return }
+
+        if panel.isVisible {
+            closeDockedPanel()
+        } else {
+            showDockedPanel(relativeTo: button)
+        }
+    }
+
+    private func showDockedPanel(relativeTo button: NSStatusBarButton) {
+        guard let panel = panel else { return }
+
+        let buttonFrame = button.window?.convertToScreen(button.frame) ?? .zero
+        let panelWidth = panel.frame.width
+        let x = buttonFrame.midX - (panelWidth / 2)
+        let y = buttonFrame.minY - panel.frame.height - 4
+
+        panel.setFrameOrigin(NSPoint(x: max(10, x), y: y))
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            guard let self = self, !self.isDetached else { return }
+            if let panel = self.panel, panel.isVisible {
+                let mouseLocation = NSEvent.mouseLocation
+                if !panel.frame.contains(mouseLocation) {
+                    self.closeDockedPanel()
+                }
+            }
+        }
+    }
+
+    public func closeDockedPanel() {
+        panel?.orderOut(nil)
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+    }
+
+    public func toggleDetachMode() {
+        isDetached.toggle()
+        if isDetached {
+            if let monitor = eventMonitor {
+                NSEvent.removeMonitor(monitor)
+                eventMonitor = nil
+            }
+            panel?.level = .floating
+        } else {
+            if let button = statusItem?.button, panel?.isVisible == true {
+                let buttonFrame = button.window?.convertToScreen(button.frame) ?? .zero
+                let panelWidth = panel?.frame.width ?? 350
+                let x = buttonFrame.midX - (panelWidth / 2)
+                let y = buttonFrame.minY - (panel?.frame.height ?? 240) - 4
+                panel?.setFrameOrigin(NSPoint(x: max(10, x), y: y))
+            }
+        }
+        updatePanelContent()
+    }
+}
