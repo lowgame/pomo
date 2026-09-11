@@ -11,9 +11,15 @@
 
 <br/><br/>
 
-<img src="Resources/app_icon_1024.png" width="120" alt="POMO Icon" />
+<img src="assets/app_icon_1024.png" width="120" alt="POMO Icon" />
 
 <br/><br/>
+
+<p align="center">
+  <img src="assets/pomo_focus_dark.png" width="32.5%" alt="Focus Mode" />
+  <img src="assets/pomo_history_dark.png" width="32.5%" alt="Daily History & Multiplier" />
+  <img src="assets/pomo_light.png" width="32.5%" alt="Light Mode" />
+</p>
 
 *Strictly 3 colors. Zero icons. Zero clutter. Pure typographic geometry.*
 

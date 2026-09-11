@@ -267,4 +267,9 @@ public final class SessionManager: ObservableObject {
             history = []
         }
     }
+
+    public func setForPreview(todaySessions: [SessionItem], history: [DayRecord]) {
+        self.todaySessions = todaySessions
+        self.history = history
+    }
 }

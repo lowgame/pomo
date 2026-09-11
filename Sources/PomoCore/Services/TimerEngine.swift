@@ -172,4 +172,10 @@ public final class TimerEngine: ObservableObject {
             }
         }
     }
+
+    public func setForPreview(mode: TimerMode, state: TimerState, remainingSeconds: TimeInterval) {
+        self.mode = mode
+        self.state = state
+        self.remainingSeconds = remainingSeconds
+    }
 }

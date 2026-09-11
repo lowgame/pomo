@@ -13,10 +13,12 @@ public struct PomoPopoverView: View {
     public init(
         timerEngine: TimerEngine,
         sessionManager: SessionManager,
+        showHistory: Bool = false,
         onClose: @escaping () -> Void = {}
     ) {
         self.timerEngine = timerEngine
         self.sessionManager = sessionManager
+        self._showHistory = State(initialValue: showHistory)
         self.onClose = onClose
     }
 

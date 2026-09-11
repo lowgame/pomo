@@ -28,6 +28,11 @@ let package = Package(
             dependencies: ["PomoCore"],
             path: "Sources/Pomo"
         ),
+        .executableTarget(
+            name: "ScreenshotGenerator",
+            dependencies: ["PomoCore"],
+            path: "Sources/ScreenshotGenerator"
+        ),
         .testTarget(
             name: "PomoTests",
             dependencies: ["PomoCore"],
