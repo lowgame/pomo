@@ -19,65 +19,94 @@ public struct HistoryView: View {
                 .padding(.vertical, 6)
             }
             .frame(maxHeight: 180)
+            .clipped()
 
-            // Minimalist Bottom Summary
+            // Minimalist Bottom Summary (Total Focus & Sessions)
             if sessionManager.totalHistoryFocusCount > 0 {
-                HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.primary)
-                            .frame(width: 6, height: 6)
-                        Text("\(sessionManager.totalHistoryFocusCount)")
-                            .font(.premium(11, weight: .semibold))
-                            .foregroundColor(Color.primary)
-                    }
+                HStack(spacing: 6) {
+                    Text("total")
+                        .font(.premium(11, weight: .regular))
+                        .foregroundColor(Color.gray)
+
+                    Circle()
+                        .fill(Color.primary)
+                        .frame(width: 5, height: 5)
+
+                    Text("\(sessionManager.totalHistoryFocusCount)")
+                        .font(.premium(11, weight: .semibold))
+                        .foregroundColor(Color.primary)
 
                     Text("·")
-                        .foregroundColor(Color.gray.opacity(0.5))
+                        .foregroundColor(Color.gray.opacity(0.4))
 
                     Text(sessionManager.formattedTotalHistoryDuration)
                         .font(.premium(11, weight: .regular))
                         .foregroundColor(Color.gray)
                         .monospacedDigit()
                 }
-                .padding(.top, 4)
+                .padding(.top, 2)
                 .padding(.bottom, 6)
             }
         }
+        .frame(width: 350)
     }
 
     private func dayRow(for day: DayHistoryItem) -> some View {
-        HStack(spacing: 12) {
-            // Day Label (minimal text: "today", "yesterday", "10 sep")
+        HStack(spacing: 10) {
+            // Day Label (Left: 64pt fixed width)
             Text(day.displayDate)
                 .font(.premium(12, weight: day.displayDate == "today" ? .semibold : .regular))
                 .foregroundColor(day.displayDate == "today" ? Color.primary : Color.gray)
-                .frame(width: 68, alignment: .leading)
+                .frame(width: 64, alignment: .leading)
 
-            // Circles representing sessions on that day
-            if day.completedCount > 0 {
-                HStack(spacing: 5) {
-                    ForEach(0..<day.completedCount, id: \.self) { _ in
+            // Middle: Clean session representation (Never overflows)
+            HStack(spacing: 5) {
+                if day.completedCount == 0 {
+                    // Empty day
+                    Circle()
+                        .strokeBorder(Color.gray.opacity(0.35), lineWidth: 1.2)
+                        .frame(width: 7, height: 7)
+                } else if day.completedCount <= 8 {
+                    // 1 to 8 sessions: show every dot with 4-set grouping
+                    ForEach(0..<day.completedCount, id: \.self) { index in
+                        if index == 4 {
+                            Spacer().frame(width: 2)
+                        }
                         Circle()
                             .fill(Color.primary)
-                            .frame(width: 8, height: 8)
+                            .frame(width: 7, height: 7)
                     }
+                } else {
+                    // > 8 sessions (e.g. 16, 48): show 4-dot set + bold counter badge
+                    ForEach(0..<4, id: \.self) { _ in
+                        Circle()
+                            .fill(Color.primary)
+                            .frame(width: 7, height: 7)
+                    }
+
+                    Text("×\(day.completedCount)")
+                        .font(.premium(11, weight: .semibold))
+                        .foregroundColor(Color.primary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.primary.opacity(0.1))
+                        )
                 }
-            } else {
-                Circle()
-                    .strokeBorder(Color.gray.opacity(0.35), lineWidth: 1.2)
-                    .frame(width: 8, height: 8)
             }
 
             Spacer()
 
-            // Total duration for that day
+            // Right: Duration (Fixed width alignment)
             if day.completedCount > 0 {
                 Text(day.formattedDuration)
                     .font(.premium(11, weight: .regular))
                     .foregroundColor(Color.gray)
                     .monospacedDigit()
+                    .frame(width: 60, alignment: .trailing)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 }

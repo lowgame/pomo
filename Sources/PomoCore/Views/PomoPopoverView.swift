@@ -29,23 +29,23 @@ public struct PomoPopoverView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             topBarView
 
             if showHistory {
                 HistoryView(sessionManager: sessionManager)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.opacity)
             } else {
                 timerContentView
                     .transition(.opacity)
-            }
 
-            // Bottom session dots bar (Prominent hollow dots that fill up)
-            SessionDotsView(
-                completedCount: sessionManager.todayCompletedFocusCount,
-                isCurrentActive: timerEngine.mode == .focus && timerEngine.isRunning,
-                totalDurationString: sessionManager.formattedTodayDuration
-            )
+                // Bottom session dots bar (Active only in Timer Mode)
+                SessionDotsView(
+                    completedCount: sessionManager.todayCompletedFocusCount,
+                    isCurrentActive: timerEngine.mode == .focus && timerEngine.isRunning,
+                    totalDurationString: sessionManager.formattedTodayDuration
+                )
+            }
         }
         .padding(.top, 14)
         .padding(.bottom, 8)
@@ -134,7 +134,7 @@ public struct PomoPopoverView: View {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(Color.primary)
-                                .offset(x: 1.5) // Optical centering for triangle
+                                .offset(x: 1.5)
                         }
                     }
                     .frame(width: 48, height: 48)
