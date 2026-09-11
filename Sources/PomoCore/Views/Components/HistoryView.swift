@@ -28,13 +28,15 @@ public struct HistoryView: View {
                         .font(.premium(11, weight: .regular))
                         .foregroundColor(Color.gray)
 
-                    Circle()
-                        .fill(Color.primary)
-                        .frame(width: 5, height: 5)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.primary)
+                            .frame(width: 6, height: 6)
 
-                    Text("\(sessionManager.totalHistoryFocusCount)")
-                        .font(.premium(11, weight: .semibold))
-                        .foregroundColor(Color.primary)
+                        Text("× \(sessionManager.totalHistoryFocusCount)")
+                            .font(.premium(11, weight: .semibold))
+                            .foregroundColor(Color.primary)
+                    }
 
                     Text("·")
                         .foregroundColor(Color.gray.opacity(0.4))
@@ -59,40 +61,29 @@ public struct HistoryView: View {
                 .foregroundColor(day.displayDate == "today" ? Color.primary : Color.gray)
                 .frame(width: 64, alignment: .leading)
 
-            // Middle: Clean session representation (Never overflows)
+            // Middle: Clean session representation (● for <= 4, ● × N for > 4)
             HStack(spacing: 5) {
                 if day.completedCount == 0 {
                     // Empty day
                     Circle()
                         .strokeBorder(Color.gray.opacity(0.35), lineWidth: 1.2)
                         .frame(width: 7, height: 7)
-                } else if day.completedCount <= 8 {
-                    // 1 to 8 sessions: show every dot with 4-set grouping
-                    ForEach(0..<day.completedCount, id: \.self) { index in
-                        if index == 4 {
-                            Spacer().frame(width: 2)
-                        }
+                } else if day.completedCount <= 4 {
+                    // 1 to 4 sessions: show each dot (one full Pomodoro cycle)
+                    ForEach(0..<day.completedCount, id: \.self) { _ in
                         Circle()
                             .fill(Color.primary)
                             .frame(width: 7, height: 7)
                     }
                 } else {
-                    // > 8 sessions (e.g. 16, 48): show 4-dot set + bold counter badge
-                    ForEach(0..<4, id: \.self) { _ in
-                        Circle()
-                            .fill(Color.primary)
-                            .frame(width: 7, height: 7)
-                    }
+                    // > 4 sessions: Strictly ONE dot × count (e.g. ● × 16, ● × 48)
+                    Circle()
+                        .fill(Color.primary)
+                        .frame(width: 7, height: 7)
 
-                    Text("×\(day.completedCount)")
-                        .font(.premium(11, weight: .semibold))
+                    Text("× \(day.completedCount)")
+                        .font(.premium(12, weight: .medium))
                         .foregroundColor(Color.primary)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.primary.opacity(0.1))
-                        )
                 }
             }
 
