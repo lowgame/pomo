@@ -36,3 +36,29 @@ public struct DayRecord: Codable, Equatable, Sendable {
         self.totalFocusSeconds = totalFocusSeconds
     }
 }
+
+public struct DayHistoryItem: Identifiable, Equatable, Sendable {
+    public var id: String { dateString }
+    public let dateString: String
+    public let displayDate: String
+    public let completedCount: Int
+    public let totalSeconds: TimeInterval
+
+    public init(dateString: String, displayDate: String, completedCount: Int, totalSeconds: TimeInterval) {
+        self.dateString = dateString
+        self.displayDate = displayDate
+        self.completedCount = completedCount
+        self.totalSeconds = totalSeconds
+    }
+
+    public var formattedDuration: String {
+        let total = Int(totalSeconds)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+}

@@ -4,96 +4,63 @@ public struct SessionDotsView: View {
     let completedCount: Int
     let isCurrentActive: Bool
     let totalDurationString: String
-    let onPurge: () -> Void
-
-    @State private var isArmedForPurge: Bool = false
-    @State private var disarmWorkItem: DispatchWorkItem? = nil
 
     public init(
         completedCount: Int,
         isCurrentActive: Bool,
-        totalDurationString: String,
-        onPurge: @escaping () -> Void
+        totalDurationString: String
     ) {
         self.completedCount = completedCount
         self.isCurrentActive = isCurrentActive
         self.totalDurationString = totalDurationString
-        self.onPurge = onPurge
     }
 
     public var body: some View {
-        HStack(spacing: 10) {
-            // Dots Sequence (4-block groups)
+        HStack(spacing: 8) {
+            // Prominent session dots on bottom-left
             dotsCluster
 
             Spacer()
 
-            // Total Time Stat
+            // Total session duration (minimal text)
             if completedCount > 0 {
                 Text(totalDurationString)
-                    .font(.premium(11, weight: .medium))
+                    .font(.premium(12, weight: .regular))
                     .foregroundColor(Color.gray)
                     .monospacedDigit()
             }
-
-            // Armored Purge (× -> ◎)
-            purgeButton
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 18)
         .padding(.vertical, 8)
     }
 
     private var dotsCluster: some View {
-        HStack(spacing: 5) {
-            // Render at least 4 dots (one full Pomodoro cycle) or up to completedCount + 1
+        HStack(spacing: 7) {
+            // Display minimum 4 slots (1 cycle) or dynamically expand in groups of 4
             let totalSlots = max(4, ((completedCount / 4) + 1) * 4)
             ForEach(0..<totalSlots, id: \.self) { index in
                 if index < completedCount {
-                    // Completed focus session
+                    // Completed session -> içi dolu (solid)
                     Circle()
                         .fill(Color.primary)
-                        .frame(width: 6, height: 6)
+                        .frame(width: 10, height: 10)
                 } else if index == completedCount && isCurrentActive {
-                    // Currently active focus session
-                    Circle()
-                        .strokeBorder(Color.primary, lineWidth: 1.2)
-                        .frame(width: 6, height: 6)
-                } else {
-                    // Upcoming placeholder in the 4-set
-                    Circle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 4, height: 4)
-                }
-            }
-        }
-    }
-
-    private var purgeButton: some View {
-        Button(action: {
-            if isArmedForPurge {
-                // Second click: Purge permanently
-                disarmWorkItem?.cancel()
-                isArmedForPurge = false
-                onPurge()
-            } else {
-                // First click: Arm button
-                isArmedForPurge = true
-                let work = DispatchWorkItem { [self] in
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        self.isArmedForPurge = false
+                    // Currently active session -> içi boş çember içinde aktif mikro nokta
+                    ZStack {
+                        Circle()
+                            .strokeBorder(Color.primary, lineWidth: 1.8)
+                            .frame(width: 10, height: 10)
+                        Circle()
+                            .fill(Color.primary)
+                            .frame(width: 3.5, height: 3.5)
                     }
+                } else {
+                    // Incomplete / upcoming session -> içi boş (hollow)
+                    Circle()
+                        .strokeBorder(Color.gray.opacity(0.4), lineWidth: 1.4)
+                        .frame(width: 10, height: 10)
                 }
-                disarmWorkItem = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: work)
             }
-        }) {
-            Text(isArmedForPurge ? "◎" : "×")
-                .font(.premium(12, weight: .medium))
-                .foregroundColor(isArmedForPurge ? Color.primary : Color.gray.opacity(0.6))
-                .frame(width: 20, height: 20)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .help(isArmedForPurge ? "Click again to purge today's sessions" : "Purge sessions")
     }
 }

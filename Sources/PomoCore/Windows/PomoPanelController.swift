@@ -19,8 +19,6 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
     public let sessionManager = SessionManager()
     public lazy var timerEngine = TimerEngine(sessionManager: sessionManager)
 
-    private var isDetached: Bool = false
-
     private override init() {
         super.init()
     }
@@ -34,7 +32,7 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         NotificationManager.shared.requestAuthorization()
     }
 
-    // MARK: - Main Menu (Enables standard Shortcuts & Cmd+D Theme)
+    // MARK: - Main Menu
 
     private func setupMainMenu() {
         let mainMenu = NSMenu()
@@ -124,7 +122,7 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
 
         // Draw minimalist status dot icon
         let size = NSSize(width: 14, height: 16)
-        let image = NSImage(size: size, flipped: false) { rect in
+        let image = NSImage(size: size, flipped: false) { _ in
             let isRunning = self.timerEngine.isRunning
             let isRest = self.timerEngine.mode == .rest
 
@@ -161,10 +159,6 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         let popoverContent = PomoPopoverView(
             timerEngine: timerEngine,
             sessionManager: sessionManager,
-            isDetached: isDetached,
-            onToggleDetach: { [weak self] in
-                self?.toggleDetachMode()
-            },
             onClose: { [weak self] in
                 self?.closeDockedPanel()
             }
@@ -173,7 +167,7 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         let hostingView = NSHostingView(rootView: popoverContent)
 
         let panel = PomoPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 350, height: 240),
+            contentRect: NSRect(x: 0, y: 0, width: 350, height: 260),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -197,10 +191,6 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         let popoverContent = PomoPopoverView(
             timerEngine: timerEngine,
             sessionManager: sessionManager,
-            isDetached: isDetached,
-            onToggleDetach: { [weak self] in
-                self?.toggleDetachMode()
-            },
             onClose: { [weak self] in
                 self?.closeDockedPanel()
             }
@@ -244,27 +234,16 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         let current = UserDefaults.standard.string(forKey: "appTheme") ?? "system"
         let next: String
         switch current {
-        case "system": next = "dark"
         case "dark": next = "light"
-        default: next = "system"
+        case "light": next = "system"
+        default: next = "dark"
         }
         UserDefaults.standard.set(next, forKey: "appTheme")
         updatePanelContent()
     }
 
     @objc private func statusItemClicked() {
-        if isDetached {
-            if let panel = panel {
-                if panel.isVisible {
-                    panel.orderOut(nil)
-                } else {
-                    panel.makeKeyAndOrderFront(nil)
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-            }
-        } else {
-            toggleDockedPanel()
-        }
+        toggleDockedPanel()
     }
 
     private func toggleDockedPanel() {
@@ -290,7 +269,7 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self = self, !self.isDetached else { return }
+            guard let self = self else { return }
             if let panel = self.panel, panel.isVisible {
                 let mouseLocation = NSEvent.mouseLocation
                 if !panel.frame.contains(mouseLocation) {
@@ -306,25 +285,5 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
         }
-    }
-
-    public func toggleDetachMode() {
-        isDetached.toggle()
-        if isDetached {
-            if let monitor = eventMonitor {
-                NSEvent.removeMonitor(monitor)
-                eventMonitor = nil
-            }
-            panel?.level = .floating
-        } else {
-            if let button = statusItem?.button, panel?.isVisible == true {
-                let buttonFrame = button.window?.convertToScreen(button.frame) ?? .zero
-                let panelWidth = panel?.frame.width ?? 350
-                let x = buttonFrame.midX - (panelWidth / 2)
-                let y = buttonFrame.minY - (panel?.frame.height ?? 240) - 4
-                panel?.setFrameOrigin(NSPoint(x: max(10, x), y: y))
-            }
-        }
-        updatePanelContent()
     }
 }

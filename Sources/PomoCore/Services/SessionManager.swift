@@ -51,6 +51,71 @@ public final class SessionManager: ObservableObject {
         }
     }
 
+    public var totalHistoryFocusCount: Int {
+        todayCompletedFocusCount + history.reduce(0) { $0 + $1.completedFocusCount }
+    }
+
+    public var formattedTotalHistoryDuration: String {
+        let total = Int(todayCompletedFocusSeconds + history.reduce(0) { $0 + $1.totalFocusSeconds })
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+
+    public var allDayRecords: [DayHistoryItem] {
+        var items: [DayHistoryItem] = []
+
+        // 1. Today
+        items.append(
+            DayHistoryItem(
+                dateString: currentDateKey(),
+                displayDate: "today",
+                completedCount: todayCompletedFocusCount,
+                totalSeconds: todayCompletedFocusSeconds
+            )
+        )
+
+        // 2. Past history sorted newest first
+        let sortedHistory = history.sorted { $0.dateString > $1.dateString }
+        for record in sortedHistory {
+            guard record.dateString != currentDateKey() else { continue }
+            items.append(
+                DayHistoryItem(
+                    dateString: record.dateString,
+                    displayDate: formatHistoryDate(record.dateString),
+                    completedCount: record.completedFocusCount,
+                    totalSeconds: record.totalFocusSeconds
+                )
+            )
+        }
+
+        return items
+    }
+
+    public func formatHistoryDate(_ dateString: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+
+        guard let date = formatter.date(from: dateString) else {
+            return dateString
+        }
+
+        let calendar = Calendar.current
+        if calendar.isDateInYesterday(date) {
+            return "yesterday"
+        }
+
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "d MMM"
+        displayFormatter.locale = Locale(identifier: "en_US")
+        return displayFormatter.string(from: date).lowercased()
+    }
+
     // MARK: - Mutations
 
     public func recordSession(mode: TimerMode, duration: TimeInterval) {
@@ -77,7 +142,6 @@ public final class SessionManager: ObservableObject {
     public func checkAndPerformDailyReset() {
         let currentKey = currentDateKey()
         if lastActiveDate != currentKey {
-            // Archive previous day's completed focus sessions into history
             if todayCompletedFocusCount > 0 {
                 let record = DayRecord(
                     dateString: lastActiveDate,
@@ -119,7 +183,7 @@ public final class SessionManager: ObservableObject {
         }
     }
 
-    private func currentDateKey() -> String {
+    public func currentDateKey() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")

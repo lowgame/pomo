@@ -4,44 +4,73 @@ public struct ModeSwitchView: View {
     let currentMode: TimerMode
     let onSelect: (TimerMode) -> Void
 
+    @Environment(\.colorScheme) var colorScheme
+
     public init(currentMode: TimerMode, onSelect: @escaping (TimerMode) -> Void) {
         self.currentMode = currentMode
         self.onSelect = onSelect
     }
 
     public var body: some View {
-        HStack(spacing: 6) {
-            modeButton(mode: .focus, label: "focus  25m", shortcutKey: "1")
-            modeButton(mode: .rest, label: "rest  5m", shortcutKey: "2")
+        HStack(spacing: 8) {
+            focusButton
+            restButton
         }
-        .padding(3)
+        .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color.gray.opacity(0.12))
         )
     }
 
-    private func modeButton(mode: TimerMode, label: String, shortcutKey: String) -> some View {
-        let isSelected = (currentMode == mode)
+    // Focus Button (Concentric Focus Ring / Target - 0 Text)
+    private var focusButton: some View {
+        let isSelected = (currentMode == .focus)
         return Button(action: {
-            onSelect(mode)
+            onSelect(.focus)
         }) {
-            HStack(spacing: 6) {
-                Text(label)
-                    .font(.premium(12, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .primary : Color.gray)
+            ZStack {
+                // Outer focus ring
+                Circle()
+                    .strokeBorder(
+                        isSelected ? Color.primary : Color.gray.opacity(0.6),
+                        lineWidth: isSelected ? 1.8 : 1.4
+                    )
+                    .frame(width: 18, height: 18)
 
-                Text(shortcutKey)
-                    .font(.premium(9, weight: .light))
-                    .foregroundColor(isSelected ? Color.gray : Color.gray.opacity(0.5))
+                // Inner focus dot
+                Circle()
+                    .fill(isSelected ? Color.primary : Color.gray.opacity(0.6))
+                    .frame(width: 6, height: 6)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .frame(width: 46, height: 32)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? (Color.primary.opacity(0.14)) : Color.clear)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.primary.opacity(0.14) : Color.clear)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help("Focus (25m)")
+    }
+
+    // Rest Button (Minimalist Cup / Pause - 0 Text)
+    private var restButton: some View {
+        let isSelected = (currentMode == .rest)
+        return Button(action: {
+            onSelect(.rest)
+        }) {
+            Image(systemName: isSelected ? "cup.and.saucer.fill" : "cup.and.saucer")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundColor(isSelected ? Color.primary : Color.gray.opacity(0.6))
+                .frame(width: 46, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? Color.primary.opacity(0.14) : Color.clear)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Rest (5m)")
     }
 }
