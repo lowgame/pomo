@@ -4,7 +4,7 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 cd "$DIR"
 
-echo "=== pomo Minimalist Glowish Sliced Circle İkonu Üretiliyor ==="
+echo "=== pomo Ultra-Glowish Sliced Circle İkonu Üretiliyor ==="
 
 swift - << 'SWIFT'
 import AppKit
@@ -35,24 +35,23 @@ let bgPath = NSBezierPath(roundedRect: rect, xRadius: 228, yRadius: 228)
 NSColor.black.setFill()
 bgPath.fill()
 
-// Specular micro-rim around macOS squircle
 let rimPath = NSBezierPath(roundedRect: rect.insetBy(dx: 2, dy: 2), xRadius: 226, yRadius: 226)
-rimPath.lineWidth = 2.5
+rimPath.lineWidth = 2.0
 NSColor(white: 1.0, alpha: 0.12).setStroke()
 rimPath.stroke()
 
 let center = CGPoint(x: size / 2, y: size / 2)
 let radius: CGFloat = 280
 
-// 2. Radiant Atmospheric Background Bloom (Radial Glow starting at 0.0)
+// 2. Deep Ethereal Ambient Radial Glow
 let colorSpace = CGColorSpaceCreateDeviceRGB()
 let glowColors = [
     NSColor(white: 1.0, alpha: 0.28).cgColor,
-    NSColor(white: 1.0, alpha: 0.14).cgColor,
-    NSColor(white: 1.0, alpha: 0.04).cgColor,
+    NSColor(white: 1.0, alpha: 0.16).cgColor,
+    NSColor(white: 1.0, alpha: 0.05).cgColor,
     NSColor(white: 0.0, alpha: 0.0).cgColor
 ] as CFArray
-let glowLocations: [CGFloat] = [0.0, 0.40, 0.70, 1.0]
+let glowLocations: [CGFloat] = [0.0, 0.35, 0.65, 1.0]
 if let radialGradient = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: glowLocations) {
     cg.saveGState()
     cg.drawRadialGradient(
@@ -60,72 +59,59 @@ if let radialGradient = CGGradient(colorsSpace: colorSpace, colors: glowColors, 
         startCenter: center,
         startRadius: 0.0,
         endCenter: center,
-        endRadius: radius * 1.6,
+        endRadius: radius * 1.55,
         options: []
     )
     cg.restoreGState()
 }
 
-// 3. Construct Sliced Circle Geometry (60-degree slice missing near 12 o'clock)
-let cutStart: CGFloat = 85.0 * .pi / 180.0  // near 12 o'clock
-let cutEnd: CGFloat = 25.0 * .pi / 180.0    // near 2 o'clock
+// 3. Sliced Circle Path (60-degree slice carved out to the center)
+let cutStart: CGFloat = 85.0 * .pi / 180.0
+let cutEnd: CGFloat = 25.0 * .pi / 180.0
 
 let pStart = CGPoint(x: center.x + radius * cos(cutStart), y: center.y + radius * sin(cutStart))
 let pEnd = CGPoint(x: center.x + radius * cos(cutEnd), y: center.y + radius * sin(cutEnd))
 
-let slicedPath = CGMutablePath()
-slicedPath.move(to: center)
-slicedPath.addLine(to: pStart)
-slicedPath.addArc(center: center, radius: radius, startAngle: cutStart, endAngle: cutEnd, clockwise: false)
-slicedPath.addLine(to: center)
-slicedPath.closeSubpath()
+let wedgePath = CGMutablePath()
+wedgePath.move(to: center)
+wedgePath.addLine(to: pStart)
+wedgePath.addArc(center: center, radius: radius, startAngle: cutStart, endAngle: cutEnd, clockwise: false)
+wedgePath.addLine(to: center)
+wedgePath.closeSubpath()
 
-// 4. Multi-tier Gaussian Glow (Bloom)
-let bloomPasses: [(blur: CGFloat, alpha: CGFloat)] = [
-    (140.0, 0.16),
-    (80.0, 0.26),
-    (40.0, 0.45),
-    (18.0, 0.70),
-    (6.0, 0.95)
+// 4. Multi-tier Physical Gaussian Glow (Matching the user's reference photo)
+let glowPasses: [(lineWidth: CGFloat, blur: CGFloat, alpha: CGFloat)] = [
+    (32.0, 180.0, 0.25),
+    (28.0, 110.0, 0.35),
+    (24.0, 60.0, 0.55),
+    (20.0, 28.0, 0.75),
+    (16.0, 12.0, 0.90),
+    (12.0, 4.0, 1.0)
 ]
 
-for pass in bloomPasses {
+for pass in glowPasses {
     cg.saveGState()
+    cg.setLineJoin(.round)
+    cg.setLineCap(.round)
+    cg.setLineWidth(pass.lineWidth)
     cg.setShadow(
         offset: .zero,
         blur: pass.blur,
         color: NSColor(white: 1.0, alpha: pass.alpha).cgColor
     )
-    cg.addPath(slicedPath)
-    cg.setFillColor(NSColor(white: 1.0, alpha: 0.35).cgColor)
-    cg.fillPath()
+    cg.addPath(wedgePath)
+    cg.setStrokeColor(NSColor(white: 1.0, alpha: pass.alpha).cgColor)
+    cg.strokePath()
     cg.restoreGState()
 }
 
-// 5. Core Luminous Body (Pure White with Subtle Vignelli Gradient)
+// 5. Crisp Brilliant White Core Filament (10pt stroke with rounded joints)
 cg.saveGState()
-cg.addPath(slicedPath)
-cg.clip()
-
-let coreColors = [
-    NSColor(white: 1.0, alpha: 1.0).cgColor,
-    NSColor(white: 0.94, alpha: 1.0).cgColor
-] as CFArray
-if let coreGrad = CGGradient(colorsSpace: colorSpace, colors: coreColors, locations: [0.0, 1.0]) {
-    cg.drawLinearGradient(
-        coreGrad,
-        start: CGPoint(x: center.x, y: center.y + radius),
-        end: CGPoint(x: center.x, y: center.y - radius),
-        options: []
-    )
-}
-cg.restoreGState()
-
-// 6. Intense Razor-Sharp Glowing Edge Stroke
-cg.saveGState()
-cg.addPath(slicedPath)
+cg.setLineJoin(.round)
+cg.setLineCap(.round)
+cg.setLineWidth(10.0)
+cg.addPath(wedgePath)
 cg.setStrokeColor(NSColor.white.cgColor)
-cg.setLineWidth(2.5)
 cg.strokePath()
 cg.restoreGState()
 
