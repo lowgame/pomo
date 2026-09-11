@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Concentric Dot Button (Toggles History Tab)
+// MARK: - Pixel-Perfect Concentric Dot Button (Toggles History Tab)
 
 public struct ConcentricDotButton: View {
     let isActive: Bool
@@ -17,26 +17,26 @@ public struct ConcentricDotButton: View {
     public var body: some View {
         Button(action: action) {
             ZStack {
-                // Outer Ring
+                // Outer Ring: 16x16 with 1.5pt border -> Inner clear diameter is 13pt
                 Circle()
                     .strokeBorder(
                         isActive || isHovered
                             ? (colorScheme == .dark ? Color.white : Color.black)
                             : Color.gray.opacity(0.55),
-                        lineWidth: 1.4
+                        lineWidth: 1.5
                     )
                     .frame(width: 16, height: 16)
 
-                // Center Dot
+                // Center Dot: 6x6 (exact integer center: (16 - 6) / 2 = 5.0pt)
                 Circle()
                     .fill(
                         isActive || isHovered
                             ? (colorScheme == .dark ? Color.white : Color.black)
                             : Color.gray.opacity(0.55)
                     )
-                    .frame(width: 5, height: 5)
+                    .frame(width: 6, height: 6)
             }
-            .frame(width: 28, height: 28)
+            .frame(width: 28, height: 28, alignment: .center)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -45,7 +45,7 @@ public struct ConcentricDotButton: View {
     }
 }
 
-// MARK: - Theme Button (● Dark, ○ Light, – Auto)
+// MARK: - Pixel-Perfect Theme Button (● Dark, ○ Light, – Auto)
 
 public struct ThemeButton: View {
     let theme: String
@@ -64,25 +64,25 @@ public struct ThemeButton: View {
             ZStack {
                 switch theme {
                 case "dark":
-                    // ● (içi dolu) -> koyu tema
+                    // ● (içi dolu) -> 10x10 solid circle, perfectly centered
                     Circle()
-                        .fill(isHovered ? Color.primary : Color.primary.opacity(0.85))
-                        .frame(width: 11, height: 11)
+                        .fill(isHovered ? Color.primary : Color.primary.opacity(0.9))
+                        .frame(width: 10, height: 10)
 
                 case "light":
-                    // ○ (içi boş) -> açık tema
+                    // ○ (içi boş) -> 10x10 stroked circle, 1.5pt crisp border
                     Circle()
-                        .strokeBorder(isHovered ? Color.primary : Color.primary.opacity(0.85), lineWidth: 1.6)
-                        .frame(width: 11, height: 11)
+                        .strokeBorder(isHovered ? Color.primary : Color.primary.opacity(0.9), lineWidth: 1.5)
+                        .frame(width: 10, height: 10)
 
                 default:
-                    // – -> otomatik
+                    // – -> 10x2 horizontal capsule, integer dimensions
                     Capsule()
-                        .fill(isHovered ? Color.primary : Color.primary.opacity(0.85))
-                        .frame(width: 11, height: 2.2)
+                        .fill(isHovered ? Color.primary : Color.primary.opacity(0.9))
+                        .frame(width: 10, height: 2)
                 }
             }
-            .frame(width: 28, height: 28)
+            .frame(width: 28, height: 28, alignment: .center)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

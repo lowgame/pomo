@@ -47,17 +47,17 @@ public struct PomoPopoverView: View {
                 totalDurationString: sessionManager.formattedTodayDuration
             )
         }
-        .padding(.top, 12)
-        .padding(.bottom, 6)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
         .frame(width: 350)
         .liquidGlassWindow(cornerRadius: 14)
         .preferredColorScheme(preferredScheme)
     }
 
-    // MARK: - Top Bar (Zero Text Clutter)
+    // MARK: - Top Bar (Zero Text Clutter, Pixel-Aligned)
 
     private var topBarView: some View {
-        HStack {
+        HStack(alignment: .center) {
             // Top-left: History Toggle (Concentric Ring & Dot)
             ConcentricDotButton(isActive: showHistory) {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
@@ -73,6 +73,7 @@ public struct PomoPopoverView: View {
             }
         }
         .padding(.horizontal, 16)
+        .frame(height: 28)
     }
 
     // MARK: - Timer Content View
@@ -90,9 +91,10 @@ public struct PomoPopoverView: View {
                 .foregroundColor(Color.primary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
+                .frame(height: 64, alignment: .center)
 
-            // Playback Controls (Play/Pause & Reset - 0 Text, Enlarged Icons)
-            HStack(spacing: 16) {
+            // Playback Controls (Play/Pause & Reset - 0 Text, Pixel-Perfect Centering)
+            HStack(spacing: 14) {
                 // Reset Button (Only visible when timer has started/paused)
                 if !timerEngine.isIdle {
                     Button(action: {
@@ -103,7 +105,7 @@ public struct PomoPopoverView: View {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(Color.gray)
-                            .frame(width: 38, height: 38)
+                            .frame(width: 40, height: 40, alignment: .center)
                             .background(
                                 Circle()
                                     .fill(Color.gray.opacity(0.12))
@@ -115,19 +117,28 @@ public struct PomoPopoverView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
 
-                // Play / Pause Button (Enlarged prominent pill/circle)
+                // Play / Pause Button (Optically centered 48x48 circle)
                 Button(action: {
                     timerEngine.togglePlayPause()
                 }) {
-                    Image(systemName: timerEngine.isRunning ? "pause.fill" : "play.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color.primary)
-                        .frame(width: 46, height: 46)
-                        .background(
-                            Circle()
-                                .fill(Color.primary.opacity(0.14))
-                        )
-                        .contentShape(Circle())
+                    ZStack(alignment: .center) {
+                        Circle()
+                            .fill(Color.primary.opacity(0.14))
+                            .frame(width: 48, height: 48)
+
+                        if timerEngine.isRunning {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(Color.primary)
+                        } else {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(Color.primary)
+                                .offset(x: 1.5) // Optical centering for triangle
+                        }
+                    }
+                    .frame(width: 48, height: 48)
+                    .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .help(timerEngine.isRunning ? "Pause" : "Start")

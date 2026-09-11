@@ -12,7 +12,7 @@ public struct ModeSwitchView: View {
     }
 
     public var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             focusButton
             restButton
         }
@@ -23,27 +23,32 @@ public struct ModeSwitchView: View {
         )
     }
 
-    // Focus Button (Concentric Focus Ring / Target - 0 Text)
+    // MARK: - Focus Button (Mathematically Concentric 20x20 with 6x6 Inner Dot)
+
     private var focusButton: some View {
         let isSelected = (currentMode == .focus)
+        let strokeWidth: CGFloat = 1.5
+        let outerSize: CGFloat = 20.0
+        let innerSize: CGFloat = 6.0
+
         return Button(action: {
             onSelect(.focus)
         }) {
-            ZStack {
-                // Outer focus ring
+            ZStack(alignment: .center) {
+                // Outer circle: 20x20
                 Circle()
                     .strokeBorder(
                         isSelected ? Color.primary : Color.gray.opacity(0.6),
-                        lineWidth: isSelected ? 1.8 : 1.4
+                        lineWidth: strokeWidth
                     )
-                    .frame(width: 18, height: 18)
+                    .frame(width: outerSize, height: outerSize)
 
-                // Inner focus dot
+                // Inner dot: 6x6, exact integer offset ((20 - 6) / 2 = 7.0pt)
                 Circle()
                     .fill(isSelected ? Color.primary : Color.gray.opacity(0.6))
-                    .frame(width: 6, height: 6)
+                    .frame(width: innerSize, height: innerSize)
             }
-            .frame(width: 46, height: 32)
+            .frame(width: 48, height: 32, alignment: .center)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(isSelected ? Color.primary.opacity(0.14) : Color.clear)
@@ -54,7 +59,8 @@ public struct ModeSwitchView: View {
         .help("Focus (25m)")
     }
 
-    // Rest Button (Minimalist Cup / Pause - 0 Text)
+    // MARK: - Rest Button (Minimalist Cup with Pixel-Aligned Centering)
+
     private var restButton: some View {
         let isSelected = (currentMode == .rest)
         return Button(action: {
@@ -63,7 +69,7 @@ public struct ModeSwitchView: View {
             Image(systemName: isSelected ? "cup.and.saucer.fill" : "cup.and.saucer")
                 .font(.system(size: 16, weight: .regular))
                 .foregroundColor(isSelected ? Color.primary : Color.gray.opacity(0.6))
-                .frame(width: 46, height: 32)
+                .frame(width: 48, height: 32, alignment: .center)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(isSelected ? Color.primary.opacity(0.14) : Color.clear)

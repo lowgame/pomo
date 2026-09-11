@@ -71,7 +71,7 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         NSApp.mainMenu = mainMenu
     }
 
-    // MARK: - Status Item Setup
+    // MARK: - Status Item Setup (Pixel Perfect Icon & Monospaced Typography)
 
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -118,32 +118,39 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
             .foregroundColor: NSColor.labelColor
         ]
 
-        button.attributedTitle = NSAttributedString(string: "  " + text, attributes: attributes)
+        button.attributedTitle = NSAttributedString(string: " " + text, attributes: attributes)
 
-        // Draw minimalist status dot icon
+        // Draw pixel-perfect status dot icon
         let size = NSSize(width: 14, height: 16)
         let image = NSImage(size: size, flipped: false) { _ in
             let isRunning = self.timerEngine.isRunning
             let isRest = self.timerEngine.mode == .rest
-
-            let dotRect = NSRect(x: 2, y: 4, width: 8, height: 8)
+            let strokeWidth: CGFloat = 1.2
+            let dotRect = NSRect(x: 2.0, y: 4.0, width: 8.0, height: 8.0)
+            let insetRect = dotRect.insetBy(dx: strokeWidth / 2, dy: strokeWidth / 2)
 
             if isRest {
-                // Rest period: concentric outline dot
-                let path = NSBezierPath(ovalIn: dotRect)
-                path.lineWidth = 1.3
+                // Rest period: Concentric ring with inner micro-dot
+                let ringPath = NSBezierPath(ovalIn: insetRect)
+                ringPath.lineWidth = strokeWidth
                 NSColor.labelColor.setStroke()
-                path.stroke()
+                ringPath.stroke()
+
+                let innerRect = NSRect(x: 4.75, y: 6.75, width: 2.5, height: 2.5)
+                let innerPath = NSBezierPath(ovalIn: innerRect)
+                NSColor.labelColor.setFill()
+                innerPath.fill()
             } else {
-                // Focus: filled solid dot when running, hollow when idle
-                let path = NSBezierPath(ovalIn: dotRect)
+                // Focus: solid filled dot when running, hollow when idle
                 if isRunning {
+                    let fillPath = NSBezierPath(ovalIn: dotRect)
                     NSColor.labelColor.setFill()
-                    path.fill()
+                    fillPath.fill()
                 } else {
-                    path.lineWidth = 1.3
+                    let strokePath = NSBezierPath(ovalIn: insetRect)
+                    strokePath.lineWidth = strokeWidth
                     NSColor.labelColor.setStroke()
-                    path.stroke()
+                    strokePath.stroke()
                 }
             }
             return true
@@ -167,7 +174,7 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         let hostingView = NSHostingView(rootView: popoverContent)
 
         let panel = PomoPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 350, height: 260),
+            contentRect: NSRect(x: 0, y: 0, width: 350, height: 250),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
