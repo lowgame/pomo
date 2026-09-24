@@ -5,6 +5,14 @@ import Combine
 final class PomoPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if (event.charactersIgnoringModifiers?.lowercased() == "s" || event.keyCode == 1) && event.modifierFlags.contains(.command) {
+            NotificationCenter.default.post(name: .pomoTriggerSave, object: nil)
+            return
+        }
+        super.keyDown(with: event)
+    }
 }
 
 @MainActor
@@ -45,9 +53,22 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
         }
         appMenu.addItem(withTitle: "Reset Timer", action: #selector(resetTimerAction), keyEquivalent: "r")
         appMenu.addItem(NSMenuItem.separator())
+        let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLoginAction), keyEquivalent: "")
+        launchAtLoginItem.target = self
+        launchAtLoginItem.state = LaunchAtLoginManager.shared.isEnabled ? .on : .off
+        appMenu.addItem(launchAtLoginItem)
+        appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Quit pomo", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
+
+        let fileMenuItem = NSMenuItem()
+        let fileMenu = NSMenu(title: "File")
+        let saveItem = NSMenuItem(title: "Save to iCloud", action: #selector(saveToiCloudAction), keyEquivalent: "s")
+        saveItem.target = self
+        fileMenu.addItem(saveItem)
+        fileMenuItem.submenu = fileMenu
+        mainMenu.addItem(fileMenuItem)
 
         let editMenuItem = NSMenuItem()
         let editMenu = NSMenu(title: "Edit")
@@ -293,4 +314,17 @@ public final class PomoPanelController: NSObject, NSWindowDelegate {
             eventMonitor = nil
         }
     }
+
+    @objc private func toggleLaunchAtLoginAction() {
+        LaunchAtLoginManager.shared.toggle()
+        setupMainMenu()
+    }
+
+    @objc private func saveToiCloudAction() {
+        NotificationCenter.default.post(name: .pomoTriggerSave, object: nil)
+    }
+}
+
+extension Notification.Name {
+    public static let pomoTriggerSave = Notification.Name("pomoTriggerSave")
 }

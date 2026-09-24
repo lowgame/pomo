@@ -192,6 +192,10 @@ public final class SessionManager: ObservableObject {
 
     // MARK: - Storage & iCloud Mirroring
 
+    private var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     private var localDataURL: URL {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fileManager.temporaryDirectory
         let pomoFolder = appSupport.appendingPathComponent("pomo", isDirectory: true)
@@ -211,9 +215,21 @@ public final class SessionManager: ObservableObject {
     }
 
     private var iCloudFolderURL: URL? {
-        fileManager.url(forUbiquityContainerIdentifier: nil)?
-            .appendingPathComponent("Documents", isDirectory: true)
-            .appendingPathComponent("pomo", isDirectory: true)
+        guard !isRunningTests else { return nil }
+        let home = fileManager.homeDirectoryForCurrentUser
+        let cloudDocs = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/pomo", isDirectory: true)
+        if fileManager.fileExists(atPath: home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs").path) {
+            if !fileManager.fileExists(atPath: cloudDocs.path) {
+                try? fileManager.createDirectory(at: cloudDocs, withIntermediateDirectories: true)
+            }
+            return cloudDocs
+        }
+        return nil
+    }
+
+    public func saveAllToCloud() {
+        saveSessions()
+        saveHistory()
     }
 
     private func saveSessions() {
@@ -222,9 +238,8 @@ public final class SessionManager: ObservableObject {
             try data.write(to: localDataURL, options: .atomic)
 
             if let cloudFolder = iCloudFolderURL {
-                try? fileManager.createDirectory(at: cloudFolder, withIntermediateDirectories: true)
                 let cloudFile = cloudFolder.appendingPathComponent("sessions.json")
-                try? data.write(to: cloudFile, options: .atomic)
+                try? data.write(to: cloudFile)
             }
         } catch {
             print("[pomo] Failed to save sessions: \(error)")
@@ -237,9 +252,8 @@ public final class SessionManager: ObservableObject {
             try data.write(to: localHistoryURL, options: .atomic)
 
             if let cloudFolder = iCloudFolderURL {
-                try? fileManager.createDirectory(at: cloudFolder, withIntermediateDirectories: true)
                 let cloudFile = cloudFolder.appendingPathComponent("history.json")
-                try? data.write(to: cloudFile, options: .atomic)
+                try? data.write(to: cloudFile)
             }
         } catch {
             print("[pomo] Failed to save history: \(error)")
@@ -247,24 +261,58 @@ public final class SessionManager: ObservableObject {
     }
 
     private func loadSessions() {
-        guard fileManager.fileExists(atPath: localDataURL.path) else { return }
-        do {
-            let data = try Data(contentsOf: localDataURL)
-            todaySessions = try JSONDecoder().decode([SessionItem].self, from: data)
-        } catch {
-            print("[pomo] Failed to load sessions: \(error)")
-            todaySessions = []
+        var loadedData: Data?
+
+        if let cloudFolder = iCloudFolderURL {
+            let cloudFile = cloudFolder.appendingPathComponent("sessions.json")
+            if fileManager.fileExists(atPath: cloudFile.path) {
+                let cloudMod = (try? fileManager.attributesOfItem(atPath: cloudFile.path)[.modificationDate] as? Date) ?? .distantPast
+                let localMod = (try? fileManager.attributesOfItem(atPath: localDataURL.path)[.modificationDate] as? Date) ?? .distantPast
+                if cloudMod >= localMod {
+                    loadedData = try? Data(contentsOf: cloudFile)
+                }
+            }
+        }
+
+        if loadedData == nil && fileManager.fileExists(atPath: localDataURL.path) {
+            loadedData = try? Data(contentsOf: localDataURL)
+        }
+
+        if let data = loadedData {
+            do {
+                todaySessions = try JSONDecoder().decode([SessionItem].self, from: data)
+            } catch {
+                print("[pomo] Failed to load sessions: \(error)")
+                todaySessions = []
+            }
         }
     }
 
     private func loadHistory() {
-        guard fileManager.fileExists(atPath: localHistoryURL.path) else { return }
-        do {
-            let data = try Data(contentsOf: localHistoryURL)
-            history = try JSONDecoder().decode([DayRecord].self, from: data)
-        } catch {
-            print("[pomo] Failed to load history: \(error)")
-            history = []
+        var loadedData: Data?
+
+        if let cloudFolder = iCloudFolderURL {
+            let cloudFile = cloudFolder.appendingPathComponent("history.json")
+            if fileManager.fileExists(atPath: cloudFile.path) {
+                let cloudMod = (try? fileManager.attributesOfItem(atPath: cloudFile.path)[.modificationDate] as? Date) ?? .distantPast
+                let localMod = (try? fileManager.attributesOfItem(atPath: localHistoryURL.path)[.modificationDate] as? Date) ?? .distantPast
+                if cloudMod >= localMod {
+                    loadedData = try? Data(contentsOf: cloudFile)
+                }
+            }
+        }
+
+        if loadedData == nil && fileManager.fileExists(atPath: localHistoryURL.path) {
+            loadedData = try? Data(contentsOf: localHistoryURL)
+        }
+
+        if let data = loadedData {
+            do {
+                history = try JSONDecoder().decode([DayRecord].self, from: data)
+            } catch {
+                print("[pomo] Failed to load history: \(error)")
+                history = []
+            }
         }
     }
 

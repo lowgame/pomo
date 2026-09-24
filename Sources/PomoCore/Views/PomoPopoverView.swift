@@ -7,6 +7,9 @@ public struct PomoPopoverView: View {
     let onClose: () -> Void
 
     @State private var showHistory: Bool = false
+    @State private var showSettingsMenu: Bool = false
+    @State private var isSavedToCloudOverlayVisible: Bool = false
+    @ObservedObject private var launchManager = LaunchAtLoginManager.shared
     @AppStorage("appTheme") private var appTheme: String = "system"
     @Environment(\.colorScheme) var colorScheme
 
@@ -31,35 +34,71 @@ public struct PomoPopoverView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 12) {
-            topBarView
+        ZStack {
+            VStack(spacing: 12) {
+                topBarView
 
-            if showHistory {
-                HistoryView(sessionManager: sessionManager)
-                    .transition(.opacity)
-            } else {
-                timerContentView
-                    .transition(.opacity)
+                if showHistory {
+                    HistoryView(sessionManager: sessionManager)
+                        .transition(.opacity)
+                } else {
+                    timerContentView
+                        .transition(.opacity)
 
-                // Bottom session dots bar (Active only in Timer Mode)
-                SessionDotsView(
-                    completedCount: sessionManager.todayCompletedFocusCount,
-                    isCurrentActive: timerEngine.mode == .focus && timerEngine.isRunning,
-                    totalDurationString: sessionManager.formattedTodayDuration
-                )
+                    // Bottom session dots bar (Active only in Timer Mode)
+                    SessionDotsView(
+                        completedCount: sessionManager.todayCompletedFocusCount,
+                        isCurrentActive: timerEngine.mode == .focus && timerEngine.isRunning,
+                        totalDurationString: sessionManager.formattedTodayDuration
+                    )
+                }
+            }
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+            .frame(width: 350)
+            .liquidGlassWindow(cornerRadius: 14)
+
+            // Full-Window "saved to icloud" Feedback Overlay
+            if isSavedToCloudOverlayVisible {
+                ZStack {
+                    (colorScheme == .dark ? Color.black : Color.white).opacity(0.88)
+                        .edgesIgnoringSafeArea(.all)
+
+                    VStack(spacing: 8) {
+                        Image(systemName: "icloud.fill")
+                            .font(.system(size: 32, weight: .semibold))
+                            .foregroundColor(colorScheme == .dark ? Color.white : Color.black)
+
+                        Text("saved to icloud")
+                            .font(.premium(14, weight: .semibold))
+                            .foregroundColor(colorScheme == .dark ? Color.white : Color.black)
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(colorScheme == .dark ? Color.black : Color.white)
+                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.6 : 0.2), radius: 20, x: 0, y: 6)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .transition(.opacity)
+                .zIndex(1000)
             }
         }
-        .padding(.top, 14)
-        .padding(.bottom, 8)
-        .frame(width: 350)
-        .liquidGlassWindow(cornerRadius: 14)
         .preferredColorScheme(preferredScheme)
+        .onReceive(NotificationCenter.default.publisher(for: .pomoTriggerSave)) { _ in
+            triggerCloudSaveHUD()
+        }
     }
 
     // MARK: - Top Bar (Zero Text Clutter, Pixel-Aligned)
 
     private var topBarView: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 10) {
             // Top-left: History Toggle (Concentric Ring & Dot)
             ConcentricDotButton(isActive: showHistory) {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
@@ -68,6 +107,102 @@ public struct PomoPopoverView: View {
             }
 
             Spacer()
+
+            // Settings Menu Button (Launch at Login, Save to iCloud, Quit)
+            Button(action: {
+                showSettingsMenu.toggle()
+            }) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Color.gray)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Settings & Launch at Login")
+            .popover(isPresented: $showSettingsMenu, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button(action: {
+                        launchManager.toggle()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: launchManager.isEnabled ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 11.5))
+                                .foregroundColor(launchManager.isEnabled ? (colorScheme == .dark ? Color.white : Color.black) : Color.gray)
+                            Text("Launch at Login")
+                                .font(.premium(12, weight: .regular))
+                                .foregroundColor(colorScheme == .dark ? Color.white : Color.black)
+                        }
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .background(Color.gray.opacity(0.2))
+
+                    Button(action: {
+                        showSettingsMenu = false
+                        triggerCloudSaveHUD()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "icloud")
+                                .font(.system(size: 11.5))
+                                .foregroundColor(Color.gray)
+                            Text("Save to iCloud")
+                                .font(.premium(12, weight: .regular))
+                                .foregroundColor(colorScheme == .dark ? Color.white : Color.black)
+                            Spacer()
+                            Text("⌘S")
+                                .font(.premium(10.5, weight: .regular))
+                                .foregroundColor(Color.gray)
+                        }
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .background(Color.gray.opacity(0.2))
+
+                    Button(action: {
+                        showSettingsMenu = false
+                        sessionManager.purgeTodaySessions()
+                    }) {
+                        Text("Reset Today's Sessions")
+                            .font(.premium(12, weight: .regular))
+                            .foregroundColor(Color.gray)
+                            .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .background(Color.gray.opacity(0.2))
+
+                    Button(action: {
+                        NSApplication.shared.terminate(nil)
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "power")
+                                .font(.system(size: 11.5))
+                                .foregroundColor(Color.gray)
+                            Text("Quit pomo")
+                                .font(.premium(12, weight: .regular))
+                                .foregroundColor(colorScheme == .dark ? Color.white : Color.black)
+                            Spacer()
+                            Text("⌘Q")
+                                .font(.premium(10.5, weight: .regular))
+                                .foregroundColor(Color.gray)
+                        }
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(12)
+                .frame(width: 210)
+                .liquidGlassWindow(cornerRadius: 10)
+            }
 
             // Top-right: Theme Button (● Dark, ○ Light, – Auto)
             ThemeButton(theme: appTheme) {
@@ -160,6 +295,21 @@ public struct PomoPopoverView: View {
                 appTheme = "system"
             default:
                 appTheme = "dark"
+            }
+        }
+    }
+
+    public func triggerCloudSaveHUD() {
+        sessionManager.saveAllToCloud()
+        withAnimation(.easeOut(duration: 0.15)) {
+            isSavedToCloudOverlayVisible = true
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 850_000_000)
+            await MainActor.run {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    isSavedToCloudOverlayVisible = false
+                }
             }
         }
     }
